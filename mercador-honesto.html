@@ -119,6 +119,17 @@
   #win p{margin:6px 0 12px;line-height:1.5}
   footer{text-align:center;font-size:13px;opacity:.75;margin-top:18px}
 
+  /* ===== Abas entre os jogos ===== */
+  .tabs{display:flex;gap:6px;margin-bottom:8px}
+  .tab{flex:1;text-align:center;padding:9px 6px;border-radius:12px;border:2px solid var(--wood);background:#fff;
+       color:var(--wood);font-weight:800;font-size:14px;text-decoration:none}
+  .tab.on{background:var(--wood);color:#fff}
+  .tab .chk{color:var(--ok);margin-left:4px}
+  .tab.on .chk{color:#bff0c2}
+  .rec{margin:0 0 8px;padding:8px 12px;border-radius:12px;background:#eaf2fb;border:2px solid var(--blue);
+       font-size:14px;line-height:1.4;text-align:center}
+  .rec a{color:var(--blue);font-weight:800}
+
   /* ===== Como jogar ===== */
   #howBtn{margin-top:8px;padding:6px 14px;font-size:14px;border-radius:999px;border:2px solid var(--wood);
           background:#fff;color:var(--wood);font-weight:700;cursor:pointer}
@@ -138,6 +149,11 @@
 </head>
 <body>
 <div id="app">
+  <nav class="tabs" aria-label="Jogos">
+    <a class="tab" href="index.html">① Balança<span class="chk" id="chk1"></span></a>
+    <a class="tab on" href="mercador-honesto.html" aria-current="page">② Mercador<span class="chk" id="chk2"></span></a>
+  </nav>
+  <div class="rec" id="recNote" hidden>💡 Recomendado: termine a <b>fase 4</b> da <a href="index.html">① Balança</a> antes de começar aqui. Mas você pode jogar quando quiser!</div>
   <header>
     <h1>🧔 O Mercador Honesto</h1>
     <div class="sub">Nem todo mercador fala a verdade. Confira com a balança!</div>
@@ -520,7 +536,7 @@ function finish(honest){
   setMsg(honest?'✅ Você reconheceu um mercador honesto!':'✅ Você descobriu o peso verdadeiro!','ok');
   if(progress.done.indexOf(ri)<0)progress.done.push(ri);
   progress.unlocked=Math.max(progress.unlocked,Math.min(ROUNDS.length,ri+2));
-  saveProgress(); renderDots();
+  saveProgress(); renderDots(); refreshTabs();
   if($('win').scrollIntoView)$('win').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
@@ -575,6 +591,19 @@ window.__mercador={startRound:startRound,addTo:addTo,removeFrom:removeFrom,pront
   state:function(){return {ri:ri,phase:phase,t:t,cur:clone(cur),msg:msgEl.textContent,win:!$('win').hidden,
     done:progress.done.slice(),unlocked:progress.unlocked,trayHidden:tray.hidden};}};
 
+/* ================= ABAS: ✓ e recomendação ================= */
+function readDone(key){
+  try{var p=JSON.parse(localStorage.getItem(key)||'null');return p&&Array.isArray(p.done)?p.done:[];}
+  catch(e){return [];}
+}
+function refreshTabs(){
+  var bal=readDone('balanca_v1');
+  $('chk1').textContent=bal.length>=8?' ✓':'';                          // o outro: lê o que ele salvou
+  $('chk2').textContent=progress.done.length>=ROUNDS.length?' ✓':'';    // este jogo: usa a memória
+  // recomendação suave (nunca bloqueia): some se a fase 4 da Balança foi feita ou se já jogou aqui
+  $('recNote').hidden=bal.indexOf(3)>=0||progress.done.length>0;
+}
+
 /* ================= COMO JOGAR (aparece só na primeira visita) ================= */
 var how=$('how');
 function openHow(){how.hidden=false;}
@@ -592,6 +621,7 @@ how.hidden=seen;
 
 loadProgress();
 startRound(0);
+refreshTabs();
 })();
 </script>
 </body>
