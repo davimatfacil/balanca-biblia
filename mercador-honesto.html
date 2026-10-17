@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O Mercador Honesto</title>
+<style>
+  :root{
+    --bg:#fbf3dd; --card:#fffaf0; --ink:#3b2a14; --wood:#7a4a1c; --gold:#e0b252;
+    --ok:#2e7d32; --bad:#c0392b; --blue:#2c6fbb;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+       -webkit-text-size-adjust:100%}
+  #app{max-width:780px;margin:0 auto;padding:12px 12px 40px}
+  header{text-align:center;margin-bottom:6px}
+  h1{font-size:clamp(22px,5vw,32px);margin:6px 0 2px}
+  .sub{font-size:14px;opacity:.75}
+
+  #dots{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:10px 0 2px}
+  .dot{width:34px;height:34px;border-radius:50%;border:2px solid var(--wood);background:#fff;color:var(--wood);
+       font-weight:800;font-size:14px;cursor:pointer}
+  .dot.done{background:#cfe9d0;border-color:var(--ok);color:var(--ok)}
+  .dot.current{background:var(--wood);color:#fff}
+  .dot:disabled{opacity:.35;cursor:not-allowed}
+  #blockLbl{text-align:center;font-size:13px;opacity:.7;margin-bottom:6px}
+
+  .card{background:var(--card);border:2px solid #e6d3a8;border-radius:14px;padding:10px 14px;margin:8px 0}
+
+  .merchant{display:flex;gap:10px;align-items:center}
+  .avatar{font-size:46px;line-height:1;flex:0 0 auto}
+  .bubble{position:relative;flex:1;background:#fff;border:2px solid #e6d3a8;border-radius:14px;padding:10px 12px;
+          font-size:15px;line-height:1.45}
+  .bubble::before{content:"";position:absolute;left:-9px;top:20px;width:14px;height:14px;background:#fff;
+          border-left:2px solid #e6d3a8;border-bottom:2px solid #e6d3a8;transform:rotate(45deg)}
+  .bubble b{color:var(--wood)}
+
+  #equation{text-align:center;font-weight:800;font-size:clamp(28px,6.5vw,44px);letter-spacing:.03em;margin:8px 0 2px}
+  #equation .sign{margin:0 .35em}
+  .eqlabel{text-align:center;font-size:13px;opacity:.7;margin-bottom:4px}
+
+  /* ===== a balança ===== */
+  #stage{position:relative;width:100%;margin:0 auto;border-radius:14px;
+         background:linear-gradient(#fff9e6,#f6ead0);border:2px solid #e6d3a8;overflow:hidden;touch-action:none}
+  #stage.hot{outline:4px dashed var(--blue);outline-offset:-4px}
+  #stage.notrans .beam,#stage.notrans .pan{transition:none}
+  .post{position:absolute;width:16px;border-radius:8px;background:linear-gradient(90deg,#8a5a2a,#b87a35,#8a5a2a)}
+  .base{position:absolute;height:14px;border-radius:7px;background:var(--wood)}
+  .pivot{position:absolute;width:26px;height:26px;border-radius:50%;background:var(--gold);border:3px solid var(--wood);
+         transform:translate(-50%,-50%);z-index:3}
+  .beam{position:absolute;height:12px;border-radius:6px;background:linear-gradient(#b87a35,#7a4a1c);
+        transform-origin:50% 50%;transition:transform .8s cubic-bezier(.25,1.6,.45,1);box-shadow:0 2px 4px rgba(0,0,0,.25);z-index:2}
+  .beam::before,.beam::after{content:"";position:absolute;top:-1px;width:14px;height:14px;border-radius:50%;
+        background:var(--gold);border:2px solid var(--wood)}
+  .beam::before{left:-7px}
+  .beam::after{right:-7px}
+  .pan{position:absolute;left:0;top:0;width:var(--panW);height:var(--panH);
+       transition:transform .8s cubic-bezier(.25,1.6,.45,1);z-index:1}
+  .pan svg{position:absolute;inset:0;width:100%;height:100%}
+  .pan .plate{position:absolute;left:0;right:0;bottom:0;height:14px;border-radius:0 0 60px 60px / 0 0 14px 14px;
+              background:linear-gradient(#c9a227,#8a6d12)}
+  .pan .items{position:absolute;left:8px;right:8px;bottom:14px;display:flex;flex-wrap:wrap-reverse;
+              align-content:flex-start;justify-content:center;gap:3px}
+
+  /* pesos, sacos e pacotes */
+  .item{width:var(--u);height:var(--u);display:flex;align-items:center;justify-content:center;font-weight:800;
+        font-size:calc(var(--u) * .5);touch-action:none;user-select:none;-webkit-user-select:none;
+        -webkit-touch-callout:none}
+  .item.drag{cursor:grab}
+  .item.u{border-radius:6px;background:linear-gradient(#ffe27a,#f0b429);border:2px solid #b9801a;color:#7a4e00;box-shadow:0 2px 0 #b9801a}
+  .item.k{width:calc(var(--u) * 1.5);border-radius:6px;background:linear-gradient(#ffd0a0,#e8893a);border:2px solid #a85a14;
+          color:#5a2e00;box-shadow:0 2px 0 #a85a14;font-size:calc(var(--u) * .46)}
+  .item.b{position:relative;width:calc(var(--u) * 1.3);height:calc(var(--u) * 1.3);border-radius:46% 46% 40% 40%;
+          background:radial-gradient(circle at 35% 30%,#c98a4b,#8d5a2b);border:2px solid #5e3a17;color:#fff;
+          font-size:calc(var(--u) * .62);font-style:italic;font-family:Georgia,serif}
+  .item.b::before{content:"";position:absolute;top:-6px;left:50%;width:38%;height:8px;transform:translateX(-50%);
+          background:#5e3a17;border-radius:4px 4px 0 0}
+  .item.b.open{background:#fff7d6;color:#7a4e00;border-color:#b9801a;font-style:normal}
+  .item.b.pop{animation:pop .6s}
+  .item.lifted{opacity:.25}
+  .ghost{position:fixed;pointer-events:none;z-index:9999;transform:translate(-50%,-50%) scale(1.15);
+         filter:drop-shadow(0 6px 6px rgba(0,0,0,.35));cursor:grabbing}
+  @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.5)}100%{transform:scale(1)}}
+
+  #sums{margin:8px 0;padding:8px 12px;border-radius:12px;background:#fff;border:2px solid #e6d3a8;font-size:15px;line-height:1.5;text-align:center}
+  #sums .res{font-weight:800;margin-top:2px}
+  #sums.ok .res{color:var(--ok)}
+  #sums.no .res{color:var(--bad)}
+
+  #msg{min-height:46px;margin:10px 0;padding:10px 12px;border-radius:12px;font-size:15px;line-height:1.4;
+       background:#fff;border:2px solid #e6d3a8}
+  #msg.ok{border-color:var(--ok);background:#eaf6ea}
+  #msg.warn{border-color:var(--bad);background:#fdecea}
+  #msg.info{border-color:var(--blue);background:#eaf2fb}
+
+  /* bandeja */
+  #tray{margin:8px 0;padding:10px;border:3px dashed #b8a47a;border-radius:14px;background:#fff;text-align:center}
+  #tray.hot{border-color:var(--blue);background:#eaf2fb}
+  #tray .lbl{font-size:14px;margin-bottom:8px}
+  #srcs{display:flex;gap:16px;justify-content:center;align-items:flex-end;flex-wrap:wrap}
+
+  #actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:12px 0;align-items:center}
+  button{font-family:inherit}
+  button.ctl{padding:10px 16px;font-size:15px;border-radius:10px;border:2px solid var(--wood);background:#fff;color:var(--wood);
+             font-weight:700;cursor:pointer}
+  button.primary{padding:12px 22px;font-size:17px;border-radius:12px;border:none;background:var(--ok);color:#fff;
+                 font-weight:800;cursor:pointer}
+  button.verd{padding:14px 22px;font-size:18px;border-radius:12px;border:none;color:#fff;font-weight:800;cursor:pointer}
+  button.verd.ok{background:var(--ok)}
+  button.verd.bad{background:var(--bad)}
+  .stepper{display:flex;align-items:center;gap:10px;font-weight:700;flex-wrap:wrap;justify-content:center}
+  .stepper button{width:48px;height:48px;border-radius:50%;border:2px solid var(--wood);background:#fff;color:var(--wood);
+                  font-size:26px;font-weight:800;cursor:pointer}
+  .stepper .n{min-width:44px;text-align:center;font-size:30px;font-family:Georgia,serif}
+
+  #win{text-align:center;border-color:var(--ok);background:#eaf6ea}
+  #win h2{margin:4px 0 8px;color:var(--ok);font-size:20px}
+  #win p{margin:6px 0 12px;line-height:1.5}
+  footer{text-align:center;font-size:13px;opacity:.75;margin-top:18px}
+
+  /* ===== Como jogar ===== */
+  #howBtn{margin-top:8px;padding:6px 14px;font-size:14px;border-radius:999px;border:2px solid var(--wood);
+          background:#fff;color:var(--wood);font-weight:700;cursor:pointer}
+  #how{position:fixed;inset:0;z-index:10000;background:rgba(59,42,20,.6);display:flex;align-items:center;
+       justify-content:center;padding:14px}
+  #how .box{background:var(--card);border:3px solid var(--wood);border-radius:18px;max-width:460px;width:100%;
+            max-height:92vh;overflow:auto;padding:16px 18px}
+  #how h2{margin:0 0 10px;font-size:22px;text-align:center}
+  #how ol{margin:0;padding:0;list-style:none}
+  #how li{display:flex;gap:10px;align-items:flex-start;margin:12px 0;line-height:1.45;font-size:16px}
+  #how .num{flex:0 0 auto;width:32px;height:32px;border-radius:50%;background:var(--wood);color:#fff;
+            font-weight:800;display:flex;align-items:center;justify-content:center}
+  #how .tip{margin-top:6px;padding:8px 10px;border-radius:10px;background:#eaf2fb;border:2px solid var(--blue);font-size:14px;line-height:1.4}
+  #how button{display:block;margin:14px auto 0;padding:12px 26px;font-size:18px;border-radius:12px;border:none;
+              background:var(--ok);color:#fff;font-weight:800;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>🧔 O Mercador Honesto</h1>
+    <div class="sub">Nem todo mercador fala a verdade. Confira com a balança!</div>
+    <button id="howBtn" type="button">❓ Como jogar</button>
+  </header>
+
+  <div id="dots" aria-label="Rodadas"></div>
+  <div id="blockLbl"></div>
+
+  <div class="card merchant">
+    <div class="avatar" id="avatar">🧔</div>
+    <div class="bubble" id="bubble"></div>
+  </div>
+
+  <div class="eqlabel">Equação da balança:</div>
+  <div id="equation" aria-live="polite"></div>
+
+  <div id="stage">
+    <div class="post" id="post"></div>
+    <div class="base" id="base"></div>
+    <div class="beam" id="beam"></div>
+    <div class="pivot" id="pivot"></div>
+    <div class="pan" id="panL"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><line x1="50" y1="0" x2="2" y2="100" stroke="#6b4a1f" stroke-width="1.5" vector-effect="non-scaling-stroke"/><line x1="50" y1="0" x2="98" y2="100" stroke="#6b4a1f" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg><div class="items" id="itemsL"></div><div class="plate"></div></div>
+    <div class="pan" id="panR"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><line x1="50" y1="0" x2="2" y2="100" stroke="#6b4a1f" stroke-width="1.5" vector-effect="non-scaling-stroke"/><line x1="50" y1="0" x2="98" y2="100" stroke="#6b4a1f" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg><div class="items" id="itemsR"></div><div class="plate"></div></div>
+  </div>
+
+  <div id="sums" hidden></div>
+  <div id="msg" class="info" aria-live="polite"></div>
+
+  <div id="tray" hidden>
+    <div class="lbl">🧺 <b>Bandeja</b>: arraste para o prato esquerdo ou direito. Para tirar algo do prato, arraste de volta para cá.</div>
+    <div id="srcs"></div>
+  </div>
+
+  <div id="actions"></div>
+
+  <section class="card" id="win" hidden>
+    <h2 id="winTitle"></h2>
+    <p id="winCheck"></p>
+    <button class="primary" id="nextBtn"></button>
+  </section>
+
+  <footer>📖 Para ler na sua Bíblia: Provérbios 11:1 e 20:23</footer>
+</div>
+
+<div id="how" role="dialog" aria-modal="true" aria-labelledby="howTitle" hidden>
+  <div class="box">
+    <h2 id="howTitle">🧔 Como jogar</h2>
+    <ol>
+      <li><span class="num">1</span><span>O mercador diz <b>quanto pesa o saco</b>. A balança já está equilibrada de verdade, mas só o saco sabe o seu peso.</span></li>
+      <li><span class="num">2</span><span>Toque em <b>⚖️ Conferir</b>: cada saco é trocado pelo valor que ele disse. Se a balança <b>continuar justa</b>, ele falou a verdade.</span></li>
+      <li><span class="num">3</span><span>Decida: <b>✅ Honesto</b> ou <b>🕵️ Enganou!</b>. Se enganou, use <b>−</b> e <b>+</b> até a balança ficar justa.</span></li>
+    </ol>
+    <div class="tip">🧺 Nas rodadas de história, <b>você monta a balança</b>: leia o que o mercador contou e arraste os itens da bandeja para o prato esquerdo ou direito.</div>
+    <button type="button" id="howOk">Entendi, vamos lá!</button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ================= AS RODADAS =================
+   Cada prato é {b: nº de sacos x, u: nº de pesos de 1}.
+   x  = peso verdadeiro do saco (a criança não vê)
+   claim = o valor que o mercador AFIRMA (honesto se claim === x)
+   k  = 'ready' (balança já montada) ou 'build' (a criança monta a partir do texto)
+   Para tirar o bloco de histórias: apague as 3 últimas rodadas (k:'build'). */
+var B1='Bloco 1 · Conferir', B2='Bloco 2 · Sacos repetidos', B3='Bloco 3 · História';
+var ROUNDS=[
+  {k:'ready',block:B1,L:{b:1,u:3},R:{b:0,u:9}, x:6,claim:8,say:'Este saco pesa <b>8</b>! Pode confiar: a balança está justa.'},
+  {k:'ready',block:B1,L:{b:1,u:6},R:{b:0,u:14},x:8,claim:8,say:'Cada saco pesa <b>8</b>. Eu nunca engano ninguém!'},
+  {k:'ready',block:B1,L:{b:1,u:4},R:{b:0,u:11},x:7,claim:5,say:'Garanto: o saco pesa <b>5</b>. A balança está justa.'},
+  {k:'ready',block:B2,L:{b:2,u:0},R:{b:0,u:10},x:5,claim:5,say:'Dois sacos iguais, e cada um pesa <b>5</b>.'},
+  {k:'ready',block:B2,L:{b:3,u:2},R:{b:0,u:14},x:4,claim:5,say:'Cada saco pesa <b>5</b>. Pode conferir, se quiser…'},
+  {k:'ready',block:B2,L:{b:4,u:1},R:{b:0,u:13},x:3,claim:4,say:'Quatro sacos e um peso, e cada saco pesa <b>4</b>!'},
+  {k:'build',block:B3,L:{b:2,u:3},R:{b:0,u:13},x:5,claim:5,say:'À esquerda ponho <b>2 sacos e 3 pesos</b>. À direita, <b>13 pesos</b>. A balança fica justa, e cada saco pesa <b>5</b>!'},
+  {k:'build',block:B3,L:{b:3,u:1},R:{b:0,u:13},x:4,claim:5,say:'À esquerda: <b>3 sacos e 1 peso</b>. À direita: <b>13 pesos</b>. Balança justa, e cada saco pesa <b>5</b>!'},
+  {k:'build',block:B3,L:{b:3,u:1},R:{b:1,u:9}, x:4,claim:3,say:'À esquerda: <b>3 sacos e 1 peso</b>. À direita: <b>1 saco e 9 pesos</b>. Balança justa, e cada saco pesa <b>3</b>!'}
+];
+
+var MAXTILT=12, K=3, MAXITEMS=24, TMIN=1, TMAX=20;
+
+/* ================= ESTADO ================= */
+var ri=0;          // rodada atual
+var phase='claim'; // build | claim | tested | fix | done
+var cur;           // conteúdo dos pratos {L:{b,u}, R:{b,u}}
+var t;             // valor que está sendo testado no lugar do saco
+var popNext=false; // animar os sacos quando "abrem"
+var progress={unlocked:1,done:[]};
+
+/* ================= ELEMENTOS ================= */
+function $(id){return document.getElementById(id);}
+var stage=$('stage'), beam=$('beam'), pivot=$('pivot'), post=$('post'), baseEl=$('base');
+var pans={L:{el:$('panL'),items:$('itemsL')}, R:{el:$('panR'),items:$('itemsR')}};
+var tray=$('tray'), eqEl=$('equation'), msgEl=$('msg');
+var G={};
+
+/* ================= AUXILIARES ================= */
+function clone(o){return JSON.parse(JSON.stringify(o));}
+function R(){return ROUNDS[ri];}
+function val(s,v){return s.b*v+s.u;}                       // peso do prato se cada saco pesa v
+function term(b){return b===1?'x':b+'x';}
+function fmt(s){
+  var p=[]; if(s.b>0)p.push(term(s.b)); if(s.u>0)p.push(String(s.u));
+  return p.length?p.join(' + '):'0';
+}
+function words(p){
+  var a=[];
+  if(p.b>0)a.push(p.b+(p.b===1?' saco':' sacos'));
+  if(p.u>0)a.push(p.u+(p.u===1?' peso':' pesos'));
+  return a.join(' e ');
+}
+function subst(s,v){                                        // "3 × 5 + 1"
+  var p=[];
+  if(s.b>0)p.push(s.b===1?String(v):s.b+' × '+v);
+  if(s.u>0)p.push(String(s.u));
+  return p.length?p.join(' + '):'0';
+}
+function chk(s,v){var tx=subst(s,v),n=val(s,v);return tx===String(n)?String(n):tx+' = '+n;}
+function count(s){return s.b+s.u;}
+function level(){return val(cur.L,t)===val(cur.R,t);}
+function setMsg(text,kind){msgEl.className=kind||'info';msgEl.innerHTML=text;}
+
+/* ================= GEOMETRIA (igual ao jogo 1) ================= */
+function layout(){
+  var W=stage.clientWidth;
+  var panW=Math.max(130,Math.min(250,W*0.36));
+  var panH=Math.round(Math.min(200,Math.max(150,panW*0.8)));
+  var H=(W-panW)/2-2;
+  var cy=34, cx=W/2;
+  var maxDrop=H*Math.sin(MAXTILT*Math.PI/180);
+  var stageH=Math.round(cy+maxDrop+panH+12);
+  var u=Math.max(22,Math.min(38,Math.round(panW/6.5)));
+  G={W:W,panW:panW,panH:panH,H:H,cx:cx,cy:cy};
+  stage.style.height=stageH+'px';
+  stage.style.setProperty('--panW',panW+'px');
+  stage.style.setProperty('--panH',panH+'px');
+  document.documentElement.style.setProperty('--u',u+'px');
+  beam.style.left=(cx-H)+'px'; beam.style.top=(cy-6)+'px'; beam.style.width=(2*H)+'px';
+  pivot.style.left=cx+'px'; pivot.style.top=cy+'px';
+  post.style.left=(cx-8)+'px'; post.style.top=cy+'px'; post.style.height=(stageH-cy-6)+'px';
+  baseEl.style.width=Math.min(170,W*0.4)+'px';
+  baseEl.style.left=(cx-Math.min(170,W*0.4)/2)+'px'; baseEl.style.top=(stageH-14)+'px';
+}
+
+/* Antes de conferir a balança está justa (a equação é verdadeira com o x real).
+   Depois de conferir, ela pende conforme o valor t que o mercador afirmou. */
+function tiltDiff(){
+  if(phase==='build'||phase==='claim')return 0;
+  return val(cur.R,t)-val(cur.L,t);
+}
+function setTilt(animate){
+  if(!animate){stage.classList.add('notrans');}
+  var th=Math.max(-MAXTILT,Math.min(MAXTILT,tiltDiff()*K));
+  var rad=th*Math.PI/180;
+  beam.style.transform='rotate('+th+'deg)';
+  var lx=G.cx-G.H*Math.cos(rad), ly=G.cy-G.H*Math.sin(rad);
+  var rx=G.cx+G.H*Math.cos(rad), ry=G.cy+G.H*Math.sin(rad);
+  pans.L.el.style.transform='translate('+(lx-G.panW/2)+'px,'+ly+'px)';
+  pans.R.el.style.transform='translate('+(rx-G.panW/2)+'px,'+ry+'px)';
+  if(!animate){void stage.offsetWidth; stage.classList.remove('notrans');}
+}
+
+/* ================= ARRASTAR (mouse e toque) ================= */
+function startDrag(e,srcEl,o){
+  if(e.pointerType==='mouse'&&e.button!==0)return;
+  e.preventDefault();
+  var r=srcEl.getBoundingClientRect();
+  var ghost=srcEl.cloneNode(true);
+  ghost.classList.add('ghost');
+  ghost.style.width=r.width+'px'; ghost.style.height=r.height+'px';
+  ghost.style.left=e.clientX+'px'; ghost.style.top=e.clientY+'px';
+  document.body.appendChild(ghost);
+  srcEl.classList.add('lifted');
+  var sx=e.clientX, sy=e.clientY, moved=false;
+  function over(ev){
+    var b=o.hot.getBoundingClientRect(), m=14;
+    return ev.clientX>=b.left-m&&ev.clientX<=b.right+m&&ev.clientY>=b.top-m&&ev.clientY<=b.bottom+m;
+  }
+  function move(ev){
+    ghost.style.left=ev.clientX+'px'; ghost.style.top=ev.clientY+'px';
+    if(Math.hypot(ev.clientX-sx,ev.clientY-sy)>8)moved=true;
+    o.hot.classList.toggle('hot',over(ev));
+  }
+  function finish(){
+    window.removeEventListener('pointermove',move);
+    window.removeEventListener('pointerup',up);
+    window.removeEventListener('pointercancel',finish);
+    ghost.remove(); srcEl.classList.remove('lifted'); o.hot.classList.remove('hot');
+  }
+  function up(ev){
+    finish();
+    if(!moved){if(o.tap)o.tap();}
+    else if(over(ev)){o.drop(ev);}
+    else if(o.miss){o.miss();}
+  }
+  window.addEventListener('pointermove',move);
+  window.addEventListener('pointerup',up);
+  window.addEventListener('pointercancel',finish);
+}
+
+/* ================= DESENHO ================= */
+function makeItem(kind,side){
+  var el=document.createElement('div');
+  el.className='item '+kind;
+  if(kind==='b'){
+    if(phase==='tested'||phase==='fix'||phase==='done'){          // saco "aberto": mostra o valor testado
+      el.classList.add('open'); el.textContent=String(t);
+      if(popNext)el.classList.add('pop');
+    }else el.textContent='x';
+  }else el.textContent='1';
+  if(phase==='build'){                                            // só dá para tirar itens na montagem
+    el.classList.add('drag');
+    el.addEventListener('pointerdown',function(ev){
+      startDrag(ev,el,{
+        hot:tray,
+        drop:function(){removeFrom(side,kind);},
+        tap:function(){setMsg('👆 Para tirar do prato, arraste este item de volta para a bandeja.','info');},
+        miss:function(){setMsg('Solte na bandeja 🧺 para tirar do prato.','info');}
+      });
+    });
+  }
+  return el;
+}
+function renderPans(){
+  ['L','R'].forEach(function(side){
+    var box=pans[side].items; box.innerHTML='';
+    var i; for(i=0;i<cur[side].b;i++)box.appendChild(makeItem('b',side));
+    for(i=0;i<cur[side].u;i++)box.appendChild(makeItem('u',side));
+  });
+}
+function renderEq(){
+  eqEl.innerHTML='<span>'+fmt(cur.L)+'</span><span class="sign">=</span><span>'+fmt(cur.R)+'</span>';
+}
+function renderSums(){
+  var box=$('sums');
+  if(phase!=='tested'&&phase!=='fix'&&phase!=='done'){box.hidden=true;return;}
+  var a=val(cur.L,t), b=val(cur.R,t), eq=a===b;
+  box.hidden=false; box.className=eq?'ok':'no';
+  box.innerHTML='Prato esquerdo: <b>'+chk(cur.L,t)+'</b><br>Prato direito: <b>'+chk(cur.R,t)+'</b>'+
+    '<div class="res">'+a+(eq?' = ':' ≠ ')+b+(eq?' → balança justa ✅':' → balança injusta')+'</div>';
+}
+function renderBubble(){
+  $('bubble').innerHTML=R().say;
+  $('blockLbl').textContent='Rodada '+(ri+1)+' de '+ROUNDS.length+' · '+R().block;
+}
+function renderDots(){
+  var box=$('dots'); box.innerHTML='';
+  ROUNDS.forEach(function(_,i){
+    var b=document.createElement('button');
+    var d=progress.done.indexOf(i)>=0;
+    b.className='dot'+(i===ri?' current':'')+(d?' done':'');
+    b.textContent=d&&i!==ri?'✓':String(i+1);
+    b.disabled=i>=progress.unlocked;
+    b.setAttribute('aria-label','Rodada '+(i+1));
+    b.addEventListener('click',function(){startRound(i);});
+    box.appendChild(b);
+  });
+}
+function renderActions(){
+  var box=$('actions'); box.innerHTML='';
+  function btn(label,cls,fn){var b=document.createElement('button');b.className=cls;b.innerHTML=label;b.addEventListener('click',fn);box.appendChild(b);return b;}
+  if(phase==='build'){btn('✔ Pronto, montei!','primary',pronto);}
+  else if(phase==='claim'){btn('⚖️ Conferir o que ele disse','primary',conferir);}
+  else if(phase==='tested'){
+    btn('✅ Honesto','verd ok',function(){verdict(true);});
+    btn('🕵️ Enganou!','verd bad',function(){verdict(false);});
+  }else if(phase==='fix'){
+    var st=document.createElement('div'); st.className='stepper';
+    st.innerHTML='<span>O saco pesa:</span>';
+    var m=document.createElement('button'); m.textContent='−'; m.setAttribute('aria-label','menos');
+    m.addEventListener('click',function(){step(-1);});
+    var n=document.createElement('span'); n.className='n'; n.textContent=String(t);
+    var p=document.createElement('button'); p.textContent='+'; p.setAttribute('aria-label','mais');
+    p.addEventListener('click',function(){step(1);});
+    st.appendChild(m); st.appendChild(n); st.appendChild(p);
+    box.appendChild(st);
+  }
+  if(phase!=='done')btn('🔄 Recomeçar a rodada','ctl',function(){startRound(ri);});
+}
+function render(){
+  renderPans(); renderEq(); renderSums(); renderActions(); renderBubble(); renderDots();
+  tray.hidden=phase!=='build';
+  setTilt(true);
+  popNext=false;
+}
+
+/* ================= MONTAR A BALANÇA (bandeja) ================= */
+function sideAt(ev){
+  var b=stage.getBoundingClientRect();
+  return ev.clientX<b.left+b.width/2?'L':'R';
+}
+function addTo(side,kind,n){
+  if(phase!=='build')return false;
+  var add=kind==='k'?5:1, key=kind==='b'?'b':'u';
+  if(count(cur[side])+add>MAXITEMS){setMsg('Esse prato já está cheio!','warn');return false;}
+  cur[side][key]+=add;
+  render();
+  setMsg('Muito bem. Continue montando conforme o mercador contou.','info');
+  return true;
+}
+function removeFrom(side,kind){
+  if(phase!=='build'||cur[side][kind]<=0)return false;
+  cur[side][kind]--;
+  render();
+  return true;
+}
+function pronto(){
+  if(phase!=='build')return false;
+  var r=R(), bad=[];
+  ['L','R'].forEach(function(s){
+    var want=r[s], have=cur[s];
+    if(want.b!==have.b||want.u!==have.u){
+      bad.push('Prato '+(s==='L'?'esquerdo':'direito')+': devia ter <b>'+words(want)+'</b>, tem '+(count(have)?words(have):'nada')+'.');
+    }
+  });
+  if(bad.length){setMsg('📖 Releia o que o mercador contou. '+bad.join(' '),'warn');return false;}
+  phase='claim';
+  render();
+  setMsg('✅ Montou direitinho! Agora confira o que o mercador disse.','ok');
+  return true;
+}
+
+/* ================= CONFERIR, VEREDITO, AJUSTE ================= */
+function conferir(){
+  if(phase!=='claim')return false;
+  phase='tested'; t=R().claim; popNext=true;
+  render();
+  setMsg('Trocamos cada saco pelo peso que ele disse (<b>'+t+'</b>). A balança ficou justa? Decida!','info');
+  return true;
+}
+/* Dica de raciocínio: o prato com mais sacos ficou mais pesado ou mais leve? */
+function hintFor(v){
+  var s=cur.L.b-cur.R.b;                         // saldo de sacos (esquerda − direita)
+  var f=val(cur.L,v)-val(cur.R,v);               // >0: esquerda mais pesada
+  var side=s>0?'esquerdo':'direito';
+  var bagHeavier=(f*s>0);
+  return 'O prato '+side+' (o que tem mais sacos) ficou mais <b>'+(bagHeavier?'pesado':'leve')+
+         '</b>, então o saco pesa <b>'+(bagHeavier?'menos':'mais')+'</b> do que '+v+'.';
+}
+function verdict(sayHonest){
+  if(phase!=='tested')return false;
+  var truth=(R().claim===R().x);
+  if(sayHonest===truth){
+    if(truth){finish(true);}
+    else{
+      phase='fix'; $('avatar').textContent='😅';
+      render();
+      setMsg('🕵️ Isso! A balança pendeu. '+hintFor(t)+' Ajuste o peso do saco até a balança ficar justa.','info');
+    }
+  }else if(truth){
+    setMsg('Olhe a balança: <b>'+val(cur.L,t)+' = '+val(cur.R,t)+'</b>. Ficou justa, então ele falou a verdade! 😇','warn');
+  }else{
+    setMsg('Olhe bem: <b>'+val(cur.L,t)+' ≠ '+val(cur.R,t)+'</b>. A balança pendeu, então ele enganou! 😅','warn');
+  }
+  return true;
+}
+function step(d){
+  if(phase!=='fix')return false;
+  t=Math.max(TMIN,Math.min(TMAX,t+d));
+  if(level()){finish(false);return true;}
+  render();
+  setMsg('Com <b>'+t+'</b> ainda não ficou justa. '+hintFor(t),'info');
+  return true;
+}
+
+/* ================= FIM DA RODADA ================= */
+function finish(honest){
+  var r=R();
+  phase='done'; t=r.x; popNext=true;
+  $('avatar').textContent=honest?'😇':'😅';
+  render();
+  $('winTitle').textContent=honest?'🎉 Mercador honesto! x = '+r.x:'🎉 Peso justo achado! x = '+r.x;
+  $('winCheck').innerHTML=(honest?'':'O mercador disse '+r.claim+', mas a balança não mente.<br>')+
+    '<b>Conferindo:</b> prato esquerdo '+chk(r.L,r.x)+' · prato direito '+chk(r.R,r.x)+' ✅';
+  var last=ri===ROUNDS.length-1;
+  $('nextBtn').textContent=last?'🏆 Você conferiu todos! Jogar de novo ↻':'Próxima rodada ▶';
+  $('win').hidden=false;
+  setMsg(honest?'✅ Você reconheceu um mercador honesto!':'✅ Você descobriu o peso verdadeiro!','ok');
+  if(progress.done.indexOf(ri)<0)progress.done.push(ri);
+  progress.unlocked=Math.max(progress.unlocked,Math.min(ROUNDS.length,ri+2));
+  saveProgress(); renderDots();
+  if($('win').scrollIntoView)$('win').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+/* ================= RODADAS ================= */
+function startRound(i){
+  ri=i; var r=R();
+  cur=r.k==='build'?{L:{b:0,u:0},R:{b:0,u:0}}:{L:clone(r.L),R:clone(r.R)};
+  phase=r.k==='build'?'build':'claim';
+  t=r.claim; popNext=false;
+  $('avatar').textContent='🧔';
+  $('win').hidden=true;
+  layout();
+  render();
+  setTilt(false);
+  setMsg(phase==='build'
+    ?'📖 Leia o que o mercador contou e <b>monte a balança</b> arrastando da bandeja.'
+    :'Troque o saco pelo peso que o mercador disse e veja se a balança fica justa.','info');
+}
+
+/* ================= PROGRESSO ================= */
+function saveProgress(){try{localStorage.setItem('mercador_v1',JSON.stringify(progress));}catch(e){}}
+function loadProgress(){
+  try{
+    var p=JSON.parse(localStorage.getItem('mercador_v1')||'null');
+    if(p&&typeof p.unlocked==='number'&&Array.isArray(p.done))progress=p;
+  }catch(e){}
+}
+
+/* ================= BANDEJA (fontes arrastáveis) ================= */
+[['b','x','Saco x'],['u','1','Peso de 1'],['k','×5','Pacote com 5 pesos']].forEach(function(d){
+  var src=document.createElement('div');
+  src.className='item drag '+d[0]; src.textContent=d[1]; src.title=d[2];
+  src.addEventListener('pointerdown',function(ev){
+    startDrag(ev,src,{
+      hot:stage,
+      drop:function(e2){addTo(sideAt(e2),d[0]);},
+      tap:function(){setMsg('👆 Arraste para o prato esquerdo ou direito.','info');},
+      miss:function(){setMsg('Solte o item <b>sobre a balança</b>: do lado esquerdo ou do direito.','info');}
+    });
+  });
+  $('srcs').appendChild(src);
+});
+$('nextBtn').addEventListener('click',function(){
+  startRound(ri<ROUNDS.length-1?ri+1:0);
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+window.addEventListener('resize',function(){layout();setTilt(false);});
+
+/* Gancho para testes automáticos */
+window.__mercador={startRound:startRound,addTo:addTo,removeFrom:removeFrom,pronto:pronto,conferir:conferir,
+  verdict:verdict,step:step,
+  state:function(){return {ri:ri,phase:phase,t:t,cur:clone(cur),msg:msgEl.textContent,win:!$('win').hidden,
+    done:progress.done.slice(),unlocked:progress.unlocked,trayHidden:tray.hidden};}};
+
+/* ================= COMO JOGAR (aparece só na primeira visita) ================= */
+var how=$('how');
+function openHow(){how.hidden=false;}
+function closeHow(){
+  how.hidden=true;
+  try{localStorage.setItem('mercador_how','1');}catch(e){}
+}
+$('howBtn').addEventListener('click',openHow);
+$('howOk').addEventListener('click',closeHow);
+how.addEventListener('click',function(e){if(e.target===how)closeHow();});
+window.addEventListener('keydown',function(e){if(e.key==='Escape'&&!how.hidden)closeHow();});
+var seen=false;
+try{seen=localStorage.getItem('mercador_how')==='1';}catch(e){}
+how.hidden=seen;
+
+loadProgress();
+startRound(0);
+})();
+</script>
+</body>
+</html>
